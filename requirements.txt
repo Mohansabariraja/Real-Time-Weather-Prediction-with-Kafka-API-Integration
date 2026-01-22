@@ -1,0 +1,7 @@
+requests
+kafka-python
+psycopg2-binary
+pandas
+numpy
+scikit-learn
+matplotlib

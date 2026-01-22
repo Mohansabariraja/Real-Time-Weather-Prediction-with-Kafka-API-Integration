@@ -1,0 +1,73 @@
+import psycopg2
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestRegressor
+import numpy as np
+
+# ------------------------ Database Connection ------------------------
+conn = psycopg2.connect(
+    dbname="weatherdb",
+    user="sabari",
+    password="sabbyogi",
+    host="postgres",
+    port="5432"
+)
+
+query = """
+SELECT city, temperature, condition, timestamp
+FROM weather_data
+ORDER BY timestamp;
+"""
+
+df = pd.read_sql_query(query, conn)
+conn.close()
+
+print("Data loaded successfully")
+print(df.head())
+
+# ------------------------ Data Preprocessing ------------------------
+df['timestamp'] = pd.to_datetime(df['timestamp'])
+df = df.dropna(subset=['temperature'])
+
+df['time_index'] = np.arange(len(df))
+df['temp_rolling_avg'] = df['temperature'].rolling(window=5).mean()
+
+# Features & Target
+X = df[['time_index']]
+y = df['temperature']
+
+# ------------------------ Random Forest Regression ------------------------
+model = RandomForestRegressor(n_estimators=200, random_state=42)
+model.fit(X, y)
+
+df['temp_trend'] = model.predict(X)
+
+# ------------------------ Slope Approximation ------------------------
+slope = (df['temp_trend'].iloc[-1] - df['temp_trend'].iloc[0]) / len(df)
+print("\nApprox Trend Slope:", slope)
+
+if slope > 0:
+    print("Temperature is increasing over time")
+elif slope < 0:
+    print("Temperature is decreasing over time")
+else:
+    print("Temperature is stable")
+
+# ------------------------ Visualization ------------------------
+plt.figure(figsize=(10, 5))
+
+plt.plot(df['timestamp'], df['temperature'], label='Actual Temperature')
+plt.plot(df['timestamp'], df['temp_rolling_avg'], label='Rolling Average')
+plt.plot(df['timestamp'], df['temp_trend'], label='Random Forest Trend Line')
+
+plt.xlabel('Time')
+plt.ylabel('Temperature (°C)')
+plt.title(f"Weather Trend Analysis (Random Forest) - {df['city'].iloc[0]}")
+plt.legend()
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# ------------------------ Save Results ------------------------
+df.to_csv("weather_rf_regression_results.csv", index=False)
+print("\nAnalysis saved to weather_rf_regression_results.csv")
